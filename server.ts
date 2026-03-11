@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Ensure uploads directory exists
-const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
+const uploadsDir = path.resolve(process.cwd(), "uploads");
 try {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -23,6 +23,8 @@ try {
 async function startServer() {
   try {
     const app = express();
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ limit: '50mb', extended: true }));
     const httpServer = createServer(app);
     const io = new Server(httpServer, {
       cors: {
@@ -96,7 +98,7 @@ async function startServer() {
         cb(null, uniqueSuffix + path.extname(file.originalname));
       }
     });
-    const upload = multer({ storage });
+    const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
     io.on("connection", (socket) => {
       socket.on("join-room", ({ roomId, password }: { roomId: string, password?: string }) => {
