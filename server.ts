@@ -26,12 +26,15 @@ async function startServer() {
     const httpServer = createServer(app);
     const io = new Server(httpServer, {
       cors: {
-        origin: "*",
+        origin: "https://ravenpendragon66-rgb.github.io",
         methods: ["GET", "POST"]
       }
     });
 
-    const PORT = 3000;
+    const PORT = process.env.PORT || 10000;
+    httpServer.listen(PORT,() => {
+      console.log(`Server rodando na porta ${PORT}`)
+    })
 
     // Logging middleware
     app.use((req, res, next) => {
@@ -218,8 +221,8 @@ async function startServer() {
       app.use(vite.middlewares);
     }
 
-    httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    httpServer.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   } catch (err) {
     console.error("Failed to start server:", err);

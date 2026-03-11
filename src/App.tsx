@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { Track, RoomState } from './types';
 
-const SOCKET_URL = window.location.origin;
+const SOCKET_URL = "https://multiplayermusic.onrender.com";
 
 export default function App() {
   const [roomId, setRoomId] = useState('main-room');
