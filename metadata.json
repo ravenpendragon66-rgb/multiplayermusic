@@ -1,0 +1,5 @@
+{
+  "name": "Sincronia Musical",
+  "description": "Ouça música em tempo real com amigos em salas compartilhadas. Suporta upload de músicas locais para a playlist da sala.",
+  "requestFramePermissions": []
+}
