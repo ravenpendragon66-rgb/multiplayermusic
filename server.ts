@@ -38,7 +38,7 @@ async function startServer() {
       if (origin && allowedOrigins.includes(origin)) {
         res.header("Access-Control-Allow-Origin", origin);
       }
-      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type");
       if (req.method === "OPTIONS") {
         return res.sendStatus(204);
@@ -291,6 +291,7 @@ startServer().catch(err => {
   console.error("Unhandled error in startServer:", err);
   process.exit(1);
 });
+
 
 
 

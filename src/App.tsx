@@ -330,7 +330,7 @@ export default function App() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10 lg:gap-12 items-start">
         {/* Left: Album Art */}
-        <div className="relative aspect-square max-w-md mx-auto w-full">
+        <div className="relative aspect-[4/5] sm:aspect-square max-w-md mx-auto w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentTrack?.id}
@@ -399,7 +399,7 @@ export default function App() {
           </div>
 
           {/* Playback Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-8">
               <button 
                 onClick={handlePrev}
@@ -452,7 +452,7 @@ export default function App() {
                 <Plus className="w-3 h-3" /> Adicionar
               </button>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-2 max-h-[45vh] sm:max-h-64 overflow-y-auto pr-2 custom-scrollbar">
               {tracks.map((track, index) => (
                 <div
                   key={track.id}
@@ -524,6 +524,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 
