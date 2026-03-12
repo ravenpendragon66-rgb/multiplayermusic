@@ -22,6 +22,7 @@ import { Track, RoomState } from './types';
 
 const SOCKET_URL = "https://multiplayermusic.onrender.com";
 const API_URL = import.meta.env.VITE_API_URL || "https://multiplayermusic.onrender.com";
+const LOCAL_ROOM_KEY = "sincronia:last-room";
 
 const resolveMediaUrl = (url?: string) => {
   if (!url) return "";
@@ -47,6 +48,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isInternalChange = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attemptedAutoJoin = useRef(false);
 
   useEffect(() => {
     socketRef.current = io(SOCKET_URL);
@@ -59,6 +61,7 @@ export default function App() {
       setUserCount(state.userCount);
       setIsJoined(true);
       setError(null);
+      localStorage.setItem(LOCAL_ROOM_KEY, JSON.stringify({ roomId, password }));
       if (audioRef.current) {
         audioRef.current.currentTime = state.currentTime;
       }
@@ -67,6 +70,7 @@ export default function App() {
     socketRef.current.on('join-error', ({ message }: { message: string }) => {
       setError(message);
       setIsJoined(false);
+      localStorage.removeItem(LOCAL_ROOM_KEY);
     });
 
     socketRef.current.on('sync-playback', ({ isPlaying, currentTime }: { isPlaying: boolean, currentTime: number }) => {
@@ -75,6 +79,9 @@ export default function App() {
       if (Math.abs((audioRef.current?.currentTime || 0) - currentTime) > 1) {
         if (audioRef.current) audioRef.current.currentTime = currentTime;
       }
+      requestAnimationFrame(() => {
+        isInternalChange.current = false;
+      });
     });
 
     socketRef.current.on('track-changed', ({ trackIndex }: { trackIndex: number }) => {
@@ -85,8 +92,12 @@ export default function App() {
     });
 
     socketRef.current.on('sync-seek', ({ currentTime }: { currentTime: number }) => {
+      isInternalChange.current = true;
       if (audioRef.current) audioRef.current.currentTime = currentTime;
       setCurrentTime(currentTime);
+      requestAnimationFrame(() => {
+        isInternalChange.current = false;
+      });
     });
 
     socketRef.current.on('new-track-added', ({ tracks }: { tracks: Track[] }) => {
@@ -113,6 +124,22 @@ export default function App() {
       socketRef.current?.disconnect();
     };
   }, []);
+  useEffect(() => {
+    if (!socketRef.current || attemptedAutoJoin.current) return;
+    const saved = localStorage.getItem(LOCAL_ROOM_KEY);
+    if (!saved) return;
+    try {
+      const { roomId: savedRoom, password: savedPass } = JSON.parse(saved);
+      if (savedRoom) {
+        setRoomId(savedRoom);
+        setPassword(savedPass || "");
+        socketRef.current.emit("join-room", { roomId: savedRoom, password: savedPass });
+        attemptedAutoJoin.current = true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [socketRef.current]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -130,9 +157,17 @@ export default function App() {
     }
   }, [volume]);
 
+  const handleTimeUpdate = () => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    setCurrentTime(audioRef.current?.currentTime || 0);
+  };
   const handleJoin = () => {
     if (socketRef.current && roomId) {
       socketRef.current.emit('join-room', { roomId, password });
+      localStorage.setItem(LOCAL_ROOM_KEY, JSON.stringify({ roomId, password }));
     }
   };
 
@@ -165,10 +200,7 @@ export default function App() {
     socketRef.current?.emit('seek', { roomId, currentTime: time });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+    const uploadFile = async (file: File) => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('audio', file);
@@ -184,11 +216,23 @@ export default function App() {
       if (!res.ok) throw new Error('Upload failed');
     } catch (err) {
       console.error(err);
-      alert('Falha ao carregar mÃºsica.');
+      alert('Falha ao carregar música.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
+  };
+
+  const handleDropUpload = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    await uploadFile(file);
   };
 
   const formatTime = (time: number) => {
@@ -281,7 +325,7 @@ export default function App() {
       <audio
         ref={audioRef}
         src={resolveMediaUrl(currentTrack?.url)}
-        onTimeUpdate={() => !isInternalChange.current && setCurrentTime(audioRef.current?.currentTime || 0)}
+        onTimeUpdate={handleTimeUpdate}
         onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
         onEnded={handleNext}
       />
@@ -441,8 +485,26 @@ export default function App() {
             </div>
           </div>
 
-          {/* Playlist Preview */}
+                    {/* Playlist Preview */}
           <div className="pt-8 border-t border-zinc-800">
+            <div
+              className="mb-4 rounded-2xl border-2 border-dashed border-emerald-500/30 bg-zinc-900/40 p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer hover:border-emerald-400/60 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); handleDropUpload(e.dataTransfer.files); }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div className="flex-1 text-sm text-zinc-300">
+                <p className="font-semibold text-white">Adicionar música</p>
+                <p className="text-xs text-zinc-500">Clique ou solte um arquivo de áudio para enviar para a sala.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {isUploading && <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />}
+                <span className="text-xs text-emerald-400">{isUploading ? 'Enviando...' : 'Escolher arquivo'}</span>
+              </div>
+            </div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Playlist da Sala</h3>
               <button 
@@ -524,6 +586,18 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
