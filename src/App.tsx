@@ -14,7 +14,8 @@ import {
   Plus,
   Loader2,
   Upload,
-  Trash2
+  Trash2,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -169,6 +170,17 @@ export default function App() {
       socketRef.current.emit('join-room', { roomId, password });
       localStorage.setItem(LOCAL_ROOM_KEY, JSON.stringify({ roomId, password }));
     }
+  };
+
+  const handleLeave = () => {
+    localStorage.removeItem(LOCAL_ROOM_KEY);
+    socketRef.current?.emit('leave-room', { roomId });
+    setIsJoined(false);
+    setTracks([]);
+    setCurrentTrackIndex(0);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setUserCount(0);
   };
 
   const togglePlay = () => {
@@ -368,6 +380,13 @@ export default function App() {
           >
             {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             <span className="text-sm font-semibold">Adicionar Música</span>
+          </button>
+          <button 
+            onClick={handleLeave}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full border border-red-500/30 transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-semibold">Sair da sala</span>
           </button>
         </div>
       </header>
@@ -586,6 +605,13 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

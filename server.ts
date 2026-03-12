@@ -190,6 +190,14 @@ async function startServer() {
         }
       });
 
+      socket.on("leave-room", ({ roomId }: { roomId: string }) => {
+        const room = rooms.get(roomId);
+        if (room) {
+          socket.leave(roomId);
+          room.users.delete(socket.id);
+          io.to(roomId).emit("user-left", { userCount: room.users.size });
+        }
+      });
       socket.on("disconnecting", () => {
         for (const roomId of socket.rooms) {
           const room = rooms.get(roomId);
@@ -291,6 +299,7 @@ startServer().catch(err => {
   console.error("Unhandled error in startServer:", err);
   process.exit(1);
 });
+
 
 
 
