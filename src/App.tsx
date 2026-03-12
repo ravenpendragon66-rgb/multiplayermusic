@@ -13,7 +13,8 @@ import {
   Radio,
   Plus,
   Loader2,
-  Upload
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -39,6 +40,7 @@ export default function App() {
   const [isJoined, setIsJoined] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
@@ -90,6 +92,14 @@ export default function App() {
     socketRef.current.on('new-track-added', ({ tracks }: { tracks: Track[] }) => {
       setTracks(tracks);
     });
+
+    socketRef.current.on('track-removed', ({ tracks, currentTrackIndex }: { tracks: Track[], currentTrackIndex: number }) => {
+      setTracks(tracks);
+      setCurrentTrackIndex(currentTrackIndex ?? 0);
+      setCurrentTime(0);
+    });
+
+
 
     socketRef.current.on('user-joined', ({ userCount }: { userCount: number }) => {
       setUserCount(userCount);
@@ -186,6 +196,23 @@ export default function App() {
     const secs = Math.floor(time % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+  const handleDeleteTrack = async (trackId: string) => {
+    if (!roomId) return;
+    setDeletingId(trackId);
+    try {
+      const res = await fetch(`${API_URL}/api/tracks/${trackId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId })
+      });
+      if (!res.ok) throw new Error('Delete failed');
+    } catch (err) {
+      console.error(err);
+      alert('Falha ao apagar música.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (!isJoined) {
     return (
@@ -261,21 +288,31 @@ export default function App() {
 
       <input 
         type="file" 
+        id="file-input"
         ref={fileInputRef} 
         onChange={handleFileUpload} 
         accept="audio/*" 
         className="hidden" 
       />
+      <div className="sm:hidden px-4">
+        <label className="block text-xs text-zinc-400 mb-2">Adicionar música</label>
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={handleFileUpload}
+          className="block w-full text-sm text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-lg p-2"
+        />
+      </div>
 
       {/* Header */}
-      <header className="p-6 flex justify-between items-center max-w-5xl mx-auto w-full">
+      <header className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-0 sm:justify-between sm:items-center max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
             <Music className="w-5 h-5 text-black" />
           </div>
           <span className="font-bold text-xl tracking-tight">Sincronia</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-full border border-zinc-800">
             <Users className="w-4 h-4 text-emerald-500" />
             <span className="text-sm font-medium">{userCount} online</span>
@@ -291,7 +328,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 grid lg:grid-cols-2 gap-12 items-center">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10 lg:gap-12 items-start">
         {/* Left: Album Art */}
         <div className="relative aspect-square max-w-md mx-auto w-full">
           <AnimatePresence mode="wait">
@@ -417,31 +454,43 @@ export default function App() {
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
               {tracks.map((track, index) => (
-                <button
+                <div
                   key={track.id}
-                  onClick={() => socketRef.current?.emit('change-track', { roomId, trackIndex: index })}
                   className={cn(
-                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all text-left",
+                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all text-left border",
                     index === currentTrackIndex 
-                      ? "bg-emerald-500/10 border border-emerald-500/20" 
-                      : "hover:bg-zinc-900 border border-transparent"
+                      ? "bg-emerald-500/10 border-emerald-500/20" 
+                      : "hover:bg-zinc-900 border-transparent"
                   )}
                 >
-                  <img src={resolveMediaUrl(track.cover)} className="w-10 h-10 rounded-lg object-cover" alt="" referrerPolicy="no-referrer" />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn("font-medium truncate", index === currentTrackIndex ? "text-emerald-500" : "text-white")}>
-                      {track.title}
-                    </p>
-                    <p className="text-xs text-zinc-500 truncate">{track.artist}</p>
-                  </div>
-                  {index === currentTrackIndex && isPlaying && (
-                    <div className="flex gap-1 items-end h-3">
-                      <motion.div animate={{ height: [4, 12, 4] }} transition={{ duration: 0.5, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
-                      <motion.div animate={{ height: [8, 4, 8] }} transition={{ duration: 0.6, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
-                      <motion.div animate={{ height: [6, 10, 6] }} transition={{ duration: 0.4, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
+                  <button
+                    onClick={() => socketRef.current?.emit('change-track', { roomId, trackIndex: index })}
+                    className="flex items-center gap-4 flex-1 text-left"
+                  >
+                    <img src={resolveMediaUrl(track.cover)} className="w-10 h-10 rounded-lg object-cover shrink-0" alt="" referrerPolicy="no-referrer" />
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("font-medium truncate", index === currentTrackIndex ? "text-emerald-500" : "text-white")}>
+                        {track.title}
+                      </p>
+                      <p className="text-xs text-zinc-500 truncate">{track.artist}</p>
                     </div>
-                  )}
-                </button>
+                    {index === currentTrackIndex && isPlaying && (
+                      <div className="flex gap-1 items-end h-3">
+                        <motion.div animate={{ height: [4, 12, 4] }} transition={{ duration: 0.5, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
+                        <motion.div animate={{ height: [8, 4, 8] }} transition={{ duration: 0.6, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
+                        <motion.div animate={{ height: [6, 10, 6] }} transition={{ duration: 0.4, repeat: Infinity }} className="w-1 bg-emerald-500 rounded-full" />
+                      </div>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTrack(track.id)}
+                    className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 border border-transparent hover:border-red-500/30 transition-colors"
+                    disabled={deletingId === track.id}
+                    title="Apagar"
+                  >
+                    {deletingId === track.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
+                </div>
               ))}
               {tracks.length === 0 && (
                 <p className="text-center py-8 text-zinc-600 text-sm italic">A playlist estÃ¡ vazia.</p>
@@ -475,6 +524,23 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -124,7 +124,7 @@ async function startServer() {
         cb(null, uniqueSuffix + path.extname(file.originalname));
       }
     });
-    const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+    const upload = multer({ storage });
 
     io.on("connection", (socket) => {
       socket.on("join-room", ({ roomId, password }: { roomId: string, password?: string }) => {
@@ -226,6 +226,35 @@ async function startServer() {
       res.json(newTrack);
     });
 
+    app.delete("/api/tracks/:id", (req, res) => {
+      const { roomId } = req.body as { roomId?: string };
+      const trackId = req.params.id;
+
+      if (!roomId) return res.status(400).json({ error: "Missing roomId" });
+      const room = rooms.get(roomId);
+      if (!room) return res.status(404).json({ error: "Room not found" });
+
+      const trackIndex = room.tracks.findIndex((t) => t.id === trackId);
+      if (trackIndex === -1) return res.status(404).json({ error: "Track not found" });
+
+      const [removed] = room.tracks.splice(trackIndex, 1);
+
+      if (removed.url?.includes("/uploads/")) {
+        const fileName = removed.url.split("/uploads/")[1];
+        if (fileName) {
+          const filePath = path.join(uploadsDir, fileName);
+          fs.unlink(filePath, () => {});
+        }
+      }
+
+      if (room.currentTrackIndex >= room.tracks.length) {
+        room.currentTrackIndex = Math.max(0, room.tracks.length - 1);
+      }
+
+      io.to(roomId).emit("track-removed", { trackId, tracks: room.tracks, currentTrackIndex: room.currentTrackIndex });
+      res.json({ ok: true, tracks: room.tracks });
+    });
+
     // Serve frontend
     const distPath = path.resolve(process.cwd(), "dist");
     const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(distPath);
@@ -262,6 +291,10 @@ startServer().catch(err => {
   console.error("Unhandled error in startServer:", err);
   process.exit(1);
 });
+
+
+
+
 
 
 
