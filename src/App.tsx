@@ -20,6 +20,12 @@ import { cn } from './lib/utils';
 import { Track, RoomState } from './types';
 
 const SOCKET_URL = "https://multiplayermusic.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://multiplayermusic.onrender.com";
+
+const resolveMediaUrl = (url?: string) => {
+  if (!url) return "";
+  return url.startsWith("http") ? url : `${API_URL}${url}`;
+};
 
 export default function App() {
   const [roomId, setRoomId] = useState('main-room');
@@ -161,7 +167,7 @@ export default function App() {
     formData.append('artist', 'Local Upload');
 
     try {
-      const res = await fetch('/api/upload', {
+      const res = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         body: formData
       });
@@ -247,7 +253,7 @@ export default function App() {
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-emerald-500/30">
       <audio
         ref={audioRef}
-        src={currentTrack?.url}
+        src={resolveMediaUrl(currentTrack?.url)}
         onTimeUpdate={() => !isInternalChange.current && setCurrentTime(audioRef.current?.currentTime || 0)}
         onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
         onEnded={handleNext}
@@ -421,7 +427,7 @@ export default function App() {
                       : "hover:bg-zinc-900 border border-transparent"
                   )}
                 >
-                  <img src={track.cover} className="w-10 h-10 rounded-lg object-cover" alt="" referrerPolicy="no-referrer" />
+                  <img src={resolveMediaUrl(track.cover)} className="w-10 h-10 rounded-lg object-cover" alt="" referrerPolicy="no-referrer" />
                   <div className="flex-1 min-w-0">
                     <p className={cn("font-medium truncate", index === currentTrackIndex ? "text-emerald-500" : "text-white")}>
                       {track.title}
@@ -469,3 +475,9 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
+

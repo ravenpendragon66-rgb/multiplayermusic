@@ -25,18 +25,36 @@ async function startServer() {
     const app = express();
     app.use(express.json({ limit: '50mb' }));
     app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+    const allowedOrigins = [
+      "https://ravenpendragon66-rgb.github.io",
+      "https://ravenpendragon66-rgb.github.io/multiplayermusic",
+      "http://localhost:5173",
+      process.env.CLIENT_ORIGIN
+    ].filter(Boolean) as string[];
+
+    app.use((req, res, next) => {
+      const origin = req.headers.origin as string | undefined;
+      if (origin && allowedOrigins.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+      }
+      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type");
+      if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+      }
+      next();
+    });
+
     const httpServer = createServer(app);
     const io = new Server(httpServer, {
       cors: {
-        origin: "https://ravenpendragon66-rgb.github.io",
+        origin: allowedOrigins,
         methods: ["GET", "POST"]
       }
     });
 
     const PORT = process.env.PORT || 10000;
-    httpServer.listen(PORT,() => {
-      console.log(`Server rodando na porta ${PORT}`)
-    })
 
     // Logging middleware
     app.use((req, res, next) => {
@@ -87,6 +105,14 @@ async function startServer() {
         cover: "https://picsum.photos/seed/daft/400/400"
       }
     ];
+
+    const getPublicBaseUrl = (req: any) => {
+      const configured = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+      if (configured) return configured;
+      const proto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0] || req.protocol || 'http';
+      const host = req.get('host');
+      return `${proto}://${host}`;
+    };
 
     // Multer config for file uploads
     const storage = multer.diskStorage({
@@ -191,7 +217,7 @@ async function startServer() {
         id: Date.now().toString(),
         title: title || req.file.originalname,
         artist: artist || "Unknown Artist",
-        url: `/uploads/${req.file.filename}`,
+        url: `${getPublicBaseUrl(req)}/uploads/${req.file.filename}`,
         cover: `https://picsum.photos/seed/${req.file.filename}/400/400`
       };
 
@@ -236,3 +262,17 @@ startServer().catch(err => {
   console.error("Unhandled error in startServer:", err);
   process.exit(1);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
